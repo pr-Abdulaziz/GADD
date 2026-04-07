@@ -6,7 +6,7 @@ The paper's main conclusion is straightforward: Arabic transformers are the stro
 
 > Note
 >
-> This README follows the manuscript for the study framing and uses the exported CSV artifacts under `Final_Pipeline/Output/` for the reproducible numbers in the current workspace. The local split summaries reflect cleaned and de-leaked working splits, so they do not match every high-level corpus count written in the manuscript exactly.
+> This README follows the manuscript for the study framing and uses the exported CSV artifacts under `Final_Pipeline/Output/` for the reproducible numbers in the current workspace. The local split summaries reflect cleaned and de-leaked working splits, so they do not match every high-level corpus count written in the manuscript exactly. The small set of tracked preview images used by this README lives in `Final_Pipeline/readme_assets/` because `Output/` is intentionally ignored.
 
 ## Overview
 
@@ -156,20 +156,20 @@ The hardest cases are not the most obviously sensational ones. The dominant fail
 
 The current workspace already contains exported figures and tables under `Final_Pipeline/Output/`. Representative local artifacts include:
 
-Local README previews below render when the generated `Output/` directory is present in the workspace.
+The four preview PNGs rendered below were moved out of `Output/` into `readme_assets/` so they can be tracked and displayed by GitHub while the larger generated output bundle remains ignored.
 
-![Twitter exact-model Macro-F1 under original preprocessing](Output/twitter/figures/twitter_exact_models_original_preprocessing_macro_f1_ci.png)
+![Twitter exact-model Macro-F1 under original preprocessing](readme_assets/twitter_exact_models_original_preprocessing_macro_f1_ci.png)
 
-![YouTube exact-model Macro-F1 under original preprocessing](Output/youtube/figures/youtube_exact_models_original_preprocessing_macro_f1_ci.png)
+![YouTube exact-model Macro-F1 under original preprocessing](readme_assets/youtube_exact_models_original_preprocessing_macro_f1_ci.png)
 
-![Twitter family-level preprocessing comparison](Output/twitter/figures/twitter_family_preprocessing_comparison.png)
+![Twitter family-level preprocessing comparison](readme_assets/twitter_family_preprocessing_comparison.png)
 
-![YouTube family-level preprocessing comparison](Output/youtube/figures/youtube_family_preprocessing_comparison.png)
+![YouTube family-level preprocessing comparison](readme_assets/youtube_family_preprocessing_comparison.png)
 
-- `Output/twitter/figures/twitter_exact_models_original_preprocessing_macro_f1_ci.png`
-- `Output/youtube/figures/youtube_exact_models_original_preprocessing_macro_f1_ci.png`
-- `Output/twitter/figures/twitter_family_preprocessing_comparison.png`
-- `Output/youtube/figures/youtube_family_preprocessing_comparison.png`
+- `readme_assets/twitter_exact_models_original_preprocessing_macro_f1_ci.png`
+- `readme_assets/youtube_exact_models_original_preprocessing_macro_f1_ci.png`
+- `readme_assets/twitter_family_preprocessing_comparison.png`
+- `readme_assets/youtube_family_preprocessing_comparison.png`
 - `Output/misclassification_analysis_artifacts_error_rate_panels_tighter/figures/twitter/twitter_deceptive_type_error_rate_all_preprocessing_stacked_exact_models.png`
 - `Output/misclassification_analysis_artifacts_error_rate_panels_tighter/figures/youtube/youtube_deceptive_type_error_rate_all_preprocessing_stacked_exact_models.png`
 
@@ -188,6 +188,7 @@ Final_Pipeline/
 |-- deceptive_type_error_analysis_helpers.py
 |-- exact_model_preprocessing_figures_helpers.py
 |-- misclassification_analysis_plot_helpers.py
+|-- readme_assets/
 `-- README.md
 ```
 
