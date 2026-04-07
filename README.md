@@ -1,359 +1,255 @@
-# Arabic Deepfake Detection Research Pipeline
+# Arabic Deepfake Text Detection on Social Media: Controlled Preprocessing and Cross-Platform Transferability
 
-This repository contains the notebooks and helper scripts used for an Arabic deepfake-text detection study across two platforms:
+This repository contains the notebooks, helper scripts, and local analysis artifacts used for the study *Arabic Deepfake Text Detection on Social Media: Controlled Preprocessing and Cross-Platform Transferability*. The project evaluates Arabic deepfake text detection across Twitter/X and YouTube under three controlled preprocessing views (`original`, `manual`, and `deepfake_aware`) and three model families (classical machine learning, sequence models, and fine-tuned Arabic transformers).
 
-- Twitter
-- YouTube
+The paper's main conclusion is straightforward: Arabic transformers are the strongest in-domain models, preprocessing materially changes results, and cross-platform transfer remains harder than same-platform evaluation.
 
-The study compares three preprocessing views:
+> Note
+>
+> This README follows the manuscript for the study framing and uses the exported CSV artifacts under `Final_Pipeline/Output/` for the reproducible numbers in the current workspace. The local split summaries reflect cleaned and de-leaked working splits, so they do not match every high-level corpus count written in the manuscript exactly.
 
-- `original`
-- `manual`
-- `deepfake_aware`
+## Overview
 
-It evaluates three model families:
+- Task: binary classification of Arabic `Real` vs `Fake` text
+- Platforms: Twitter/X and YouTube
+- Evaluation settings: in-domain testing and cross-platform transfer without retraining
+- Text views: `original`, `manual`, `deepfake_aware`
+- Model families: ML, sequence models, Arabic transformers
+- Label convention used by the code: `1 = Real`, `0 = Fake`
 
-- Classical ML
-- Sequence neural models
-- Fine-tuned Arabic transformers
+## Key Findings
 
-The project then analyzes:
+| Finding | Result |
+| --- | --- |
+| Best Twitter in-domain result | `CAMeLBERT` with `original` preprocessing, Macro-F1 `0.9912` |
+| Best YouTube in-domain result | `MARBERTv2` with `original` preprocessing, Macro-F1 `0.9409` |
+| Best Twitter to YouTube transfer | `MARBERTv2` with `manual` preprocessing, Macro-F1 `0.8364` |
+| Best YouTube to Twitter transfer | `AraBERTv2` with `original` preprocessing, Macro-F1 `0.9433` |
+| Strongest family overall | Fine-tuned Arabic transformers |
+| Preprocessing takeaway | `manual` cleaning hurts most; `deepfake_aware` is usually a better compromise but does not consistently beat `original` |
+| Hardest deception types | `omission` on Twitter; `contradiction` and `omission` on YouTube |
+| Hypothesis status | `H1` supported, `H2` partially supported, `H3` supported |
 
-- In-domain performance on each platform
-- Preprocessing effects
-- Misclassification behavior by deception type and metadata
-- Cross-platform transfer between Twitter and YouTube
-- Final hypothesis-level conclusions
+## Research Questions and Hypotheses
 
-Across the helper modules and analysis scripts, the binary class convention is:
+The study is organized around four research questions:
 
-- `1 = Real`
-- `0 = Fake`
+- `RQ1`: Which ML, sequence, and transformer configurations perform best under in-domain evaluation on Twitter and YouTube?
+- `RQ2`: How do preprocessing variants affect in-domain performance across representations and model families?
+- `RQ3`: How robust are source-trained models under cross-platform transfer between Twitter and YouTube?
+- `RQ4`: Where do errors concentrate across deceptive types and metadata categories?
 
-## Research Questions
+The manuscript tests three hypotheses:
 
-The local analysis bundle is organized around three main hypotheses:
+- `H1`: Fine-tuned contextual Arabic transformers will achieve the highest performance on both platforms.
+- `H2`: Preprocessing effects will be significant across representation strategies and model families.
+- `H3`: Models perform better in-domain than under cross-platform transfer.
 
-- `H1`: Fine-tuned contextual Arabic transformers achieve the strongest in-domain Macro-F1 on both platforms.
-- `H2`: Preprocessing changes performance, with special attention to `manual` and `deepfake_aware` variants relative to `original`.
-- `H3`: Cross-platform transfer is harder than in-domain evaluation, but some model families generalize better than others.
+## Dataset and Benchmark Design
 
-## What Is Versioned In GitHub
+The benchmark pairs real Arabic social media text with prompt-generated deceptive rewrites. The Twitter/X portion contains tweets and tweet comments collected across domains such as education, health, advertisements, religion, politics, economy, and sports. The YouTube portion contains Arabic comments collected from public videos through the YouTube Data API v3. The paper describes the benchmark as platform-paired and approximately balanced between real and synthetic text.
 
-The GitHub repository is intended to contain the reproducible source side of the project:
+### Corpus Summary
+
+| Platform | Real data source | Paper-reported real texts | Paper-reported total texts | Current local modeling split summary |
+| --- | --- | ---: | ---: | --- |
+| Twitter/X | Tweets and post comments | 14,403 | 28,806 | train `19,800`, val `5,657`, test `2,829` |
+| YouTube | Public video comments | 14,854 | 29,711 | train `15,846`, val `2,265`, test `5,654` |
+
+The local split summaries come from `Output/twitter/tables/dataset_split_summary_twitter.csv` and `Output/youtube/tables/dataset_split_summary_youtube.csv`. The YouTube split reflects exact-text de-leakage in the exported workspace artifacts.
+
+### Deception Types Used for Generation
+
+The paper defines six deception strategies for synthetic rewriting:
+
+| Deception type | Description | Twitter count | YouTube count |
+| --- | --- | ---: | ---: |
+| Exaggeration | Amplifies claims or emotion while preserving the topic | 2,289 | 2,543 |
+| Omission | Removes important context to create a misleading reading | 2,286 | 2,403 |
+| Contradiction | Introduces plausible statements that reverse the source meaning | 2,299 | 2,406 |
+| Satirical tone | Rewrites the text with irony or mockery while keeping it misleading | 2,376 | 2,441 |
+| Clickbait phrasing | Uses attention-grabbing or emotionally charged wording | 2,364 | 2,421 |
+| Mixed truths | Blends correct information with fabricated or misleading details | 2,333 | 2,423 |
+
+## Preprocessing Views
+
+Preprocessing is treated as an experimental factor, not just routine cleanup.
+
+| View | Intent | Behavior |
+| --- | --- | --- |
+| `original` | Reference condition | Uses the stored benchmark text as-is after initial corpus construction |
+| `manual` | Strongest cleaning condition | Removes URLs, mentions, hashtags, emojis, diacritics, Latin spans, and aggressively normalizes repetition and punctuation |
+| `deepfake_aware` | Selective normalization | Preserves or tokenizes potentially informative cues such as URLs, mentions, hashtags, and number spans depending on the platform |
+
+In the paper's framing, `manual` cleaning tends to strip away useful platform and stylistic cues, while `deepfake_aware` tries to preserve signals that may help distinguish human and AI-generated text.
+
+## Model Families
+
+The pipeline compares multiple representation and modeling strategies under the same evaluation protocol.
+
+| Family | Models | Representations / embeddings |
+| --- | --- | --- |
+| Classical ML | `LinearSVC`, `LogisticRegression`, `RandomForest` | `TF-IDF`, `Word2Vec-CBOW`, `FastText` |
+| Sequence models | `LSTM`, `BiLSTM` | `random`, `Word2Vec-CBOW`, `FastText` |
+| Transformers | `AraBERTv2`, `MARBERTv2`, `CAMeLBERT` | Contextual tokenization and fine-tuning |
+
+Core protocol reported in the paper:
+
+- maximum input length `128`
+- fixed random seed `42`
+- sequence models trained for `5` epochs
+- transformer models trained for `5` epochs with learning rate `2e-5`
+- validation Macro-F1 used for checkpoint selection
+- exact-text de-leakage applied before model fitting
+
+## Main Results
+
+### In-Domain Performance
+
+| Platform | View | ML mean | Sequence mean | Transformer mean | Best model | Best Macro-F1 |
+| --- | --- | ---: | ---: | ---: | --- | ---: |
+| Twitter | `original` | 0.9581 | 0.9757 | 0.9906 | `CAMeLBERT` | 0.9912 |
+| Twitter | `manual` | 0.9093 | 0.9344 | 0.9596 | `MARBERTv2` | 0.9625 |
+| Twitter | `deepfake_aware` | 0.9548 | 0.9736 | 0.9857 | `MARBERTv2` | 0.9869 |
+| YouTube | `original` | 0.8678 | 0.8898 | 0.9390 | `MARBERTv2` | 0.9409 |
+| YouTube | `manual` | 0.8587 | 0.8826 | 0.9303 | `MARBERTv2` | 0.9354 |
+| YouTube | `deepfake_aware` | 0.8645 | 0.8888 | 0.9318 | `MARBERTv2` | 0.9369 |
+
+These results show a stable ranking on both platforms: transformers first, sequence models second, classical ML third. The `original` view is the strongest overall condition, and `manual` preprocessing causes the clearest performance drop.
+
+### Cross-Platform Transfer
+
+| Source | Target | View | Best ML | ML Macro-F1 | Best sequence | Sequence Macro-F1 | Best transformer | Transformer Macro-F1 |
+| --- | --- | --- | --- | ---: | --- | ---: | --- | ---: |
+| Twitter | YouTube | `original` | `LinearSVC` | 0.6904 | `BiLSTM` | 0.6569 | `CAMeLBERT` | 0.7461 |
+| Twitter | YouTube | `manual` | `LogisticRegression` | 0.7861 | `BiLSTM` | 0.8048 | `MARBERTv2` | 0.8364 |
+| Twitter | YouTube | `deepfake_aware` | `LinearSVC` | 0.7613 | `BiLSTM` | 0.6506 | `CAMeLBERT` | 0.7206 |
+| YouTube | Twitter | `original` | `LinearSVC` | 0.7453 | `BiLSTM` | 0.7358 | `AraBERTv2` | 0.9433 |
+| YouTube | Twitter | `manual` | `RandomForest` | 0.7700 | `BiLSTM` | 0.7129 | `AraBERTv2` | 0.9070 |
+| YouTube | Twitter | `deepfake_aware` | `LinearSVC` | 0.7552 | `LSTM` | 0.7030 | `AraBERTv2` | 0.9099 |
+
+The local summary exports report an average Macro-F1 drop of `0.2549` for Twitter to YouTube transfer and `0.1941` for YouTube to Twitter transfer. Transformers remain the most transfer-robust family in both directions.
+
+### Hypothesis Decisions
+
+| Hypothesis | Verdict | Interpretation |
+| --- | --- | --- |
+| `H1` | Supported | Transformers significantly outperform the strongest ML and sequence baselines on both platforms |
+| `H2` | Partially supported | Preprocessing effects are real, but they are selective rather than uniformly significant across all families |
+| `H3` | Supported | Cross-platform transfer is consistently worse than in-domain testing, although transformers lose the least |
+
+### Error Analysis by Deception Type
+
+| Deception type | Twitter mean error (%) | YouTube mean error (%) |
+| --- | ---: | ---: |
+| Original real texts | 4.3 | 10.0 |
+| Clickbait phrasing | 0.5 | 3.8 |
+| Contradiction | 8.2 | 24.7 |
+| Exaggeration | 1.6 | 7.1 |
+| Mixed truths | 1.9 | 13.2 |
+| Omission | 17.7 | 24.4 |
+| Satirical tone | 1.3 | 7.0 |
+
+The hardest cases are not the most obviously sensational ones. The dominant failure modes are omission on Twitter and omission plus contradiction on YouTube, which suggests that subtle semantic distortion remains harder than surface-level exaggeration or clickbait phrasing.
+
+### Local Result Artifacts
+
+The current workspace already contains exported figures and tables under `Final_Pipeline/Output/`. Representative local artifacts include:
+
+Local README previews below render when the generated `Output/` directory is present in the workspace.
+
+![Twitter exact-model Macro-F1 under original preprocessing](Output/twitter/figures/twitter_exact_models_original_preprocessing_macro_f1_ci.png)
+
+![YouTube exact-model Macro-F1 under original preprocessing](Output/youtube/figures/youtube_exact_models_original_preprocessing_macro_f1_ci.png)
+
+![Twitter family-level preprocessing comparison](Output/twitter/figures/twitter_family_preprocessing_comparison.png)
+
+![YouTube family-level preprocessing comparison](Output/youtube/figures/youtube_family_preprocessing_comparison.png)
+
+- `Output/twitter/figures/twitter_exact_models_original_preprocessing_macro_f1_ci.png`
+- `Output/youtube/figures/youtube_exact_models_original_preprocessing_macro_f1_ci.png`
+- `Output/twitter/figures/twitter_family_preprocessing_comparison.png`
+- `Output/youtube/figures/youtube_family_preprocessing_comparison.png`
+- `Output/misclassification_analysis_artifacts_error_rate_panels_tighter/figures/twitter/twitter_deceptive_type_error_rate_all_preprocessing_stacked_exact_models.png`
+- `Output/misclassification_analysis_artifacts_error_rate_panels_tighter/figures/youtube/youtube_deceptive_type_error_rate_all_preprocessing_stacked_exact_models.png`
+
+Because `Output/` is ignored by Git, these artifacts are available locally in this workspace but are not intended to be the version-controlled source of truth.
+
+## Repository Guide
 
 ```text
-
 Final_Pipeline/
-├── Arabic_Deepfake_Detection_Twitter.ipynb
-├── Arabic_Deepfake_Detection_Youtube.ipynb
-├── EDA.ipynb
-├── results_and_analysis.ipynb
-├── deceptive_type_error_analysis_helpers.py
-├── exact_model_preprocessing_figures_helpers.py
-├── generate_misclassification_analysis_artifacts.py
-├── hypothesis_testing_analysis.py
-├── misclassification_analysis_plot_helpers.py
-└── deception_dist_twitter.png
+|-- Arabic_Deepfake_Detection_Twitter.ipynb
+|-- Arabic_Deepfake_Detection_Youtube.ipynb
+|-- EDA.ipynb
+|-- results_and_analysis.ipynb
+|-- hypothesis_testing_analysis.py
+|-- generate_misclassification_analysis_artifacts.py
+|-- deceptive_type_error_analysis_helpers.py
+|-- exact_model_preprocessing_figures_helpers.py
+|-- misclassification_analysis_plot_helpers.py
+`-- README.md
 ```
 
-The repository does not rely on GitHub to store large data or generated result bundles.
+### Notebook Roles
 
-## Notebook Guide
+- `Arabic_Deepfake_Detection_Twitter.ipynb`: full Twitter/X execution pipeline
+- `Arabic_Deepfake_Detection_Youtube.ipynb`: full YouTube execution pipeline
+- `EDA.ipynb`: descriptive analysis, label balance, text length, signal prevalence, and preprocessing examples
+- `results_and_analysis.ipynb`: compact reporting notebook built from exported artifacts
 
-### `Final_Pipeline/Arabic_Deepfake_Detection_Twitter.ipynb`
+### Script Roles
 
-This is the full Twitter execution notebook. It is the main end-to-end experiment driver for the Twitter portion of the study.
+- `hypothesis_testing_analysis.py`: reads exported platform tables and writes the compact hypothesis-testing bundle under `Output/hypothesis_tests/`
+- `generate_misclassification_analysis_artifacts.py`: builds stacked error-rate panels, FP/FN summaries, and misclassification manifests
+- `deceptive_type_error_analysis_helpers.py`: deceptive-type normalization and error analysis helpers
+- `exact_model_preprocessing_figures_helpers.py`: shared utilities for exact-model preprocessing comparisons and confidence intervals
+- `misclassification_analysis_plot_helpers.py`: misclassification loading, alignment, aggregation, and plotting helpers
 
-Main responsibilities:
+## Output Layout
 
-- Resolve local or Colab project paths
-- Validate and de-leak train/validation/test splits
-- Apply the `original`, `manual`, and `deepfake_aware` preprocessing views
-- Train or load static embeddings
-- Run classical ML models
-- Run sequence models
-- Fine-tune transformer models
-- Aggregate metrics across families
-- Export figures, tables, reports, and misclassification artifacts
-- Run statistical testing and cross-platform evaluation
-
-The notebook sections explicitly cover:
-
-- Setup and configuration
-- Data loading and split validation
-- Preprocessing definitions and dataset caching
-- Static embeddings and representations
-- ML models
-- Sequence models
-- Transformer models
-- Result aggregation
-- Statistical testing
-- Error analysis
-- Cross-platform evaluation
-- Final exports and artifact audit
-
-### `Final_Pipeline/Arabic_Deepfake_Detection_Youtube.ipynb`
-
-This notebook mirrors the Twitter notebook, but uses the YouTube dataset as the primary in-domain platform. It follows the same pipeline structure and produces a parallel output bundle under the YouTube output directory.
-
-It handles:
-
-- YouTube split loading and validation
-- Preprocessing variants
-- ML, sequence, and transformer experiments
-- Statistical testing
-- Error analysis
-- Transfer evaluation against Twitter
-- Exported tables and figures for the YouTube branch of the study
-
-### `Final_Pipeline/EDA.ipynb`
-
-This notebook is a lightweight, local-first exploratory analysis notebook focused on the training split only. Its purpose is to generate publication-ready descriptive views without retraining the models.
-
-It covers:
-
-- Dataset overview
-- Label balance
-- Text length distribution
-- Signal prevalence comparisons for Real vs Fake
-- Deception subtype distribution
-- Preprocessing and tokenization explanation tables
-
-It writes outputs to:
-
-- `Final_Pipeline/Output/eda/figures/`
-- `Final_Pipeline/Output/eda/tables/`
-
-### `Final_Pipeline/results_and_analysis.ipynb`
-
-This notebook is the compact reporting notebook. It does not retrain the full models. Instead, it consolidates exported CSV artifacts already produced by the execution notebooks and the hypothesis script.
-
-It summarizes:
-
-- In-domain performance
-- `H1` transformer-family support
-- `H2` preprocessing effects
-- Error analysis by deceptive type
-- Cross-platform transfer and `H3`
-- Final decision summary
-
-The notebook text explicitly states that its tables are derived from exported CSV artifacts rather than hand-entered values.
-
-## Helper Scripts
-
-### `Final_Pipeline/hypothesis_testing_analysis.py`
-
-This script builds the compact post-hoc reporting layer. It reads previously exported output tables and writes:
-
-- `Final_Pipeline/Output/hypothesis_tests/*.csv`
-- `Final_Pipeline/Output/hypothesis_tests/hypothesis_testing_summary.md`
-- `Final_Pipeline/results_and_analysis.ipynb`
-
-This is the correct script to run after both platform execution notebooks have produced their output tables.
-
-### `Final_Pipeline/generate_misclassification_analysis_artifacts.py`
-
-This script standardizes raw misclassification exports and produces a cleaner cross-platform artifact bundle for deception-type error analysis.
-
-It generates:
-
-- Stacked deceptive-type error-rate figures
-- FP/FN summary tables
-- FP/FN-by-deception-type tables
-- An artifact manifest and input inventory
-
-By default it writes under `Final_Pipeline/Output/`, and it also accepts a custom `--output-dir`.
-
-### `Final_Pipeline/deceptive_type_error_analysis_helpers.py`
-
-This module defines deceptive-type normalization, plotting utilities, and selection logic used for deception-type error summaries and exact-model rosters.
-
-### `Final_Pipeline/exact_model_preprocessing_figures_helpers.py`
-
-This module contains the shared figure-building and comparison utilities for exact-model preprocessing figures, confidence intervals, and family-level rendering.
-
-### `Final_Pipeline/misclassification_analysis_plot_helpers.py`
-
-This module loads and standardizes misclassification exports, aligns configuration identifiers, computes FP/FN summaries, and renders stacked error-rate panels.
-
-## Model Families And Study Configurations
-
-The versioned code and notebook content show the following core families and configurations:
-
-### Classical ML
-
-- `LinearSVC`
-- `LogisticRegression`
-- `RandomForest`
-
-These are evaluated with lexical and static-representation variants such as:
-
-- `tfidf`
-- `word2vec_cbow`
-- `fasttext`
-
-### Sequence Models
-
-- `LSTM`
-- `BiLSTM`
-
-The sequence pipeline uses random or static embedding initializations, including:
-
-- `random`
-- `word2vec_cbow`
-- `fasttext`
-
-### Transformers
-
-- `AraBERTv2`
-- `MARBERTv2`
-- `CAMeLBERT`
-
-## Local Output Structure
-
-`Final_Pipeline/Output/` is not stored on GitHub, but the local workspace currently follows a clear structure:
+The generated local output bundle is organized as follows:
 
 ```text
 Final_Pipeline/Output/
-├── eda/
-├── hypothesis_tests/
-├── important/
-├── misclassification_analysis_artifacts_error_rate_panels_tighter/
-├── twitter/
-└── youtube/
+|-- eda/
+|-- hypothesis_tests/
+|-- important/
+|-- misclassification_analysis_artifacts_error_rate_panels_tighter/
+|-- twitter/
+`-- youtube/
 ```
 
-### `Final_Pipeline/Output/eda/`
+Useful output locations:
 
-EDA tables and publication-style descriptive figures are stored here.
+- `Output/eda/`: descriptive figures and EDA tables
+- `Output/twitter/` and `Output/youtube/`: per-platform experiment outputs, cached splits, training history, figures, and tables
+- `Output/hypothesis_tests/`: final support tables for `H1`, `H2`, and `H3`
+- `Output/important/`: compact report-facing tables
+- `Output/misclassification_analysis_artifacts_error_rate_panels_tighter/`: cross-platform error analysis panels and FP/FN summaries
 
-Representative local files:
+## Reproducing the Study
 
-- `eda/figures/label_balance.png`
-- `eda/figures/text_length_distribution.png`
-- `eda/figures/deception_subtype_distribution.png`
-- `eda/tables/dataset_overview_train_split.csv`
-- `eda/tables/preprocessing_tokenization_comparison.csv`
+Recommended execution order:
 
-### `Final_Pipeline/Output/twitter/` and `Final_Pipeline/Output/youtube/`
-
-These are the main per-platform experiment bundles. Each currently contains the same high-level subdirectories:
-
-- `cache/`
-- `figures/`
-- `misclass_analysis/`
-- `ml_classifiers/`
-- `sequence_models/`
-- `tables/`
-
-Typical contents include:
-
-- Cached preprocessed train/validation/test splits
-- Per-family result tables
-- Classification reports
-- Saved model artifacts
-- Training-history exports
-- Misclassification exports
-- Aggregate experiment result tables
-- Final figure exports in PNG and PDF
-
-Representative local figure files include:
-
-- `twitter/figures/twitter_exact_models_original_preprocessing_macro_f1_ci.png`
-- `twitter/figures/twitter_family_preprocessing_comparison.png`
-- `twitter/figures/twitter_deceptive_type_error_rate_original_exact_model_roster.png`
-- `youtube/figures/youtube_exact_models_original_preprocessing_macro_f1_ci.png`
-- `youtube/figures/youtube_family_preprocessing_comparison.png`
-- `youtube/figures/youtube_deceptive_type_error_rate_original_exact_model_roster.png`
-
-Representative local table files include:
-
-- `twitter/tables/experiment_results_long.csv`
-- `twitter/tables/in_domain_predictions_long.csv`
-- `twitter/tables/best_family_preprocessing_summary.csv`
-- `twitter/tables/transfer_significance_tests.csv`
-- `youtube/tables/experiment_results_long.csv`
-- `youtube/tables/in_domain_predictions_long.csv`
-- `youtube/tables/best_family_preprocessing_summary.csv`
-- `youtube/tables/transfer_significance_tests.csv`
-
-### `Final_Pipeline/Output/important/`
-
-This directory acts as a report-facing subset of especially useful per-platform artifacts. In the current local workspace it includes, for example:
-
-- `important/twitter/deceptive_type_error_rate_summary.csv`
-- `important/twitter/all_models_cross_platform_results.csv`
-- `important/youtube/deceptive_type_error_rate_summary.csv`
-- `important/youtube/all_models_preprocessing_summary.csv`
-
-### `Final_Pipeline/Output/hypothesis_tests/`
-
-This directory contains the compact tables used to support the final reporting notebook.
-
-Representative local files:
-
-- `hypothesis_tests/in_domain_exact_model_overview.csv`
-- `hypothesis_tests/h1_family_support_tests.csv`
-- `hypothesis_tests/h2_family_wilcoxon_summary.csv`
-- `hypothesis_tests/h3_transfer_group_summary.csv`
-- `hypothesis_tests/hypothesis_decision_summary.csv`
-- `hypothesis_tests/hypothesis_testing_summary.md`
-
-### `Final_Pipeline/Output/misclassification_analysis_artifacts_error_rate_panels_tighter/`
-
-This is a generated post-processing bundle focused on tighter stacked error-rate panels and FP/FN summaries derived from raw misclassification exports.
-
-Representative local files:
-
-- `misclassification_analysis_artifacts_error_rate_panels_tighter/figures/twitter/twitter_deceptive_type_error_rate_all_preprocessing_stacked_exact_models.png`
-- `misclassification_analysis_artifacts_error_rate_panels_tighter/figures/youtube/youtube_deceptive_type_error_rate_all_preprocessing_stacked_exact_models.png`
-- `misclassification_analysis_artifacts_error_rate_panels_tighter/tables/all_platforms_fp_fn_summary.csv`
-- `misclassification_analysis_artifacts_error_rate_panels_tighter/tables/all_platforms_fp_fn_by_deceptive_type.csv`
-- `misclassification_analysis_artifacts_error_rate_panels_tighter/tables/misclassification_analysis_artifact_manifest.csv`
-
-## Current Local Findings Snapshot
-
-The current generated reporting notebook summarizes the local run as follows:
-
-- `H1` is supported: the transformer family is the strongest in-domain family on both platforms.
-- Best reported Twitter in-domain result: `CAMeLBERT` with `original` preprocessing, `Macro-F1 = 0.9912`.
-- Best reported YouTube in-domain result: `MARBERTv2` with `original` preprocessing, `Macro-F1 = 0.9409`.
-- `H2` is partially supported: preprocessing matters, but the effect is not uniformly beneficial across all families and all views.
-- `H3` is supported: cross-platform transfer loss is real, and transformers are the most stable family overall.
-- Hard deceptive types are not evenly distributed. In the current summary, `omission` is the hardest Twitter subtype, while `contradiction` and `omission` are the hardest YouTube subtypes.
-
-These numbers and conclusions come from the generated local reporting notebook and its supporting CSV tables, so they may change if the full pipeline is rerun with modified data, settings, or exports.
-
-## Recommended Execution Order
-
-If you want to rebuild the local analysis bundle from scratch, use this order:
-
-1. Place the dataset under `Dataset/` using the expected directory layout.
-2. Run `Final_Pipeline/EDA.ipynb` if you want descriptive figures and preprocessing/tokenization tables.
+1. Place the datasets under `Dataset/` using the expected local layout.
+2. Run `Final_Pipeline/EDA.ipynb` to regenerate descriptive figures and preprocessing examples.
 3. Run `Final_Pipeline/Arabic_Deepfake_Detection_Twitter.ipynb`.
 4. Run `Final_Pipeline/Arabic_Deepfake_Detection_Youtube.ipynb`.
 5. Run `python Final_Pipeline/hypothesis_testing_analysis.py`.
-6. Run `python Final_Pipeline/generate_misclassification_analysis_artifacts.py` after the per-platform misclassification exports exist.
+6. Run `python Final_Pipeline/generate_misclassification_analysis_artifacts.py`.
 
 ## Environment Notes
 
-### Execution notebooks
+The two main execution notebooks were written with a Colab-oriented bootstrap flow:
 
-The two main execution notebooks are written with a Colab-style bootstrap section:
+- the first setup cell restarts the runtime
+- the next setup cell installs pinned packages with `pip`
+- path resolution supports both Google Colab and local execution
 
-- The first code cell intentionally restarts the runtime with `os.kill(os.getpid(), 9)`.
-- The next setup cell installs pinned dependencies with `pip`.
-- The path-resolution logic supports both a local repository layout and Google Colab with Drive mounting.
+If you run the notebooks locally, create the Python environment yourself and skip the forced restart or install cells when they are not appropriate.
 
-Practical implication:
-
-- In Google Colab, the bootstrap flow is already aligned with the notebook design.
-- In a local Jupyter environment, you should create the environment yourself and skip the forced-restart/install cells if they are not appropriate for your setup.
-
-### Core Python dependencies observed in the notebooks and scripts
-
-The codebase imports these major packages:
+Observed core dependencies include:
 
 - `numpy`
 - `pandas`
@@ -371,15 +267,18 @@ The codebase imports these major packages:
 - `nbformat`
 - `openpyxl`
 
-There is no versioned `requirements.txt` in the current repository snapshot, so environment recreation is currently notebook-driven rather than package-file-driven.
+There is currently no versioned `requirements.txt`, so environment recreation is notebook-driven.
 
-## Consistency Notes
+## Data Availability
 
-- This README intentionally describes `Dataset/` and `Final_Pipeline/Output/` as local expected paths, even though they are not part of the GitHub repository.
-- Any file path listed inside those folders should be read as a generated or local-only artifact path.
-- The versioned source of truth for the research logic is the notebooks and helper scripts under `Final_Pipeline/`.
-- The compact reporting layer depends on previously exported CSV artifacts; it is not a substitute for the full execution notebooks.
+According to the manuscript, the datasets used in the study were developed in an earlier project phase and are being prepared for publication. Access is expected to be handled through the corresponding author and project stakeholders once release is approved.
 
-## Summary
+## Citation
 
-This repository is the source-code and notebook layer of a two-platform Arabic deepfake-text detection study. The dataset and generated outputs are deliberately kept out of GitHub, while the notebooks and helper modules preserve the experimental workflow, the statistical analysis logic, and the reporting pipeline needed to rebuild the local research artifacts.
+If you use this repository, cite the accompanying manuscript:
+
+```text
+Abdulaziz Alqahtani, Amal Sunba, and Tarek Helmy.
+"Arabic Deepfake Text Detection on Social Media: Controlled Preprocessing and Cross-Platform Transferability."
+2026 manuscript.
+```
