@@ -4,10 +4,6 @@ This repository contains the notebooks, helper scripts, and local analysis artif
 
 The paper's main conclusion is straightforward: Arabic transformers are the strongest in-domain models, preprocessing materially changes results, and cross-platform transfer remains harder than same-platform evaluation.
 
-> Note
->
-> This README follows the manuscript for the study framing and uses the exported CSV artifacts under `Final_Pipeline/Output/` for the reproducible numbers in the current workspace. The local split summaries reflect cleaned and de-leaked working splits, so they do not match every high-level corpus count written in the manuscript exactly. The small set of tracked preview images used by this README lives in `Final_Pipeline/readme_assets/` because `Output/` is intentionally ignored.
-
 ## Overview
 
 - Task: binary classification of Arabic `Real` vs `Fake` text
